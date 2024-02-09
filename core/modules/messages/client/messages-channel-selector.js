@@ -37,6 +37,11 @@ Template.messagesChannelSelector.onCreated(function () {
   });
 });
 
+Template.messagesChannelSelector.onDestroyed(() => {
+  window.removeEventListener(eventTypes.onUsersComeCloser, refreshChannelList);
+  window.removeEventListener(eventTypes.onUsersMovedAway, refreshChannelList);
+});
+
 Template.messagesChannelSelector.events({
   'click .js-channel-selector'(event) {
     event.preventDefault();

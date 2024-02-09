@@ -222,6 +222,9 @@ Template.radialMenu.onCreated(function () {
 
 Template.radialMenu.onDestroyed(() => {
   hotkeys.unbind('*', scopes.player);
+  document.removeEventListener('mousemove', onMouseMove);
+  window.removeEventListener(eventTypes.onMenuOptionSelected, onMenuOptionSelected);
+  window.removeEventListener(eventTypes.onMenuOptionUnselected, onMenuOptionUnselected);
 });
 
 Template.radialMenu.events({

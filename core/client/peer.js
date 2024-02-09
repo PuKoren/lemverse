@@ -14,6 +14,16 @@ const callAction = Object.freeze({
   close: 1,
 });
 
+function proximityStarted (e) {
+  const { users } = e.detail;
+  peer.onProximityStarted(users);
+}
+
+function proximityEnded (e) {
+  const { users } = e.detail;
+  peer.onProximityEnded(users);
+}
+
 peer = {
   calls: {},
   waitingCallActions: {},
@@ -30,17 +40,13 @@ peer = {
     delayBetweenAttempt: 250,
   },
   securityCheckInterval: 2000,
+  securityCheckIntervalID: null,
+  updatePeerStreamsEventListener: null,
 
   init() {
-    window.addEventListener(eventTypes.onUsersComeCloser, e => {
-      const { users } = e.detail;
-      peer.onProximityStarted(users);
-    });
+    window.addEventListener(eventTypes.onUsersComeCloser, proximityStarted);
+    window.addEventListener(eventTypes.onUsersMovedAway, proximityEnded);
 
-    window.addEventListener(eventTypes.onUsersMovedAway, e => {
-      const { users } = e.detail;
-      peer.onProximityEnded(users);
-    });
     this.enable();
 
     Tracker.autorun(() => {
@@ -51,7 +57,7 @@ peer = {
     });
 
     // For security reasons we periodically check that the users in discussion are still close to the calling users
-    window.setInterval(() => {
+    this.securityCheckIntervalID = window.setInterval(() => {
       const callEntries = Object.entries(this.remoteCalls);
       if (!callEntries.length) return;
 
@@ -64,7 +70,7 @@ peer = {
     }, this.securityCheckInterval);
 
     // Listen device connection/disconnection to update peers
-    navigator.mediaDevices.addEventListener('devicechange', async () => {
+    this.updatePeerStreamsEventListener = async () => {
       if (!this.hasActiveStreams()) return;
 
       const constraints = userStreams.getStreamConstraints(streamTypes.main);
@@ -74,7 +80,9 @@ peer = {
       if (!stream) { lp.notif.error(`unable to get a valid stream`); return; }
 
       peer.updatePeersStream(stream, streamTypes.main);
-    });
+    }
+
+    navigator.mediaDevices.addEventListener('devicechange', this.updatePeerStreamsEventListener);
   },
 
   enable() {
@@ -229,6 +237,11 @@ peer = {
     this.peerInstance?.destroy();
     this.remoteStreamsByUsers.set([]);
     delete this.peerInstance;
+
+    navigator.mediaDevices.removeEventListener('devicechange', this.updatePeerStreamsEventListener);
+    window.removeEventListener(eventTypes.onUsersComeCloser, proximityStarted);
+    window.removeEventListener(eventTypes.onUsersMovedAway, proximityEnded);
+    clearInterval(this.securityCheckIntervalID);
   },
 
   updatePeersStream(stream, type) {
